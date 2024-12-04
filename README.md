@@ -1,26 +1,76 @@
 # keystone
-- name: Install Keystone packages
+- name: Install Keystone and dependencies
   apt:
     name:
       - keystone
       - python3-openstackclient
+      - apache2
+      - libapache2-mod-wsgi-py3
     state: present
+    update_cache: true
 
-- name: Configure Keystone
+- name: Configure Keystone service
   template:
     src: keystone.conf.j2
     dest: /etc/keystone/keystone.conf
+    owner: root
+    group: root
+    mode: '0644'
 
-- name: Initialize Keystone Database
+- name: Synchronize Keystone database
   command: keystone-manage db_sync
 
 - name: Bootstrap Keystone
   command: >
-    keystone-manage bootstrap --bootstrap-password {{ keystone_admin_password }}
-                              --bootstrap-admin-url http://{{ ansible_host }}:5000/v3/
-                              --bootstrap-internal-url http://{{ ansible_host }}:5000/v3/
-                              --bootstrap-public-url http://{{ ansible_host }}:5000/v3/
-                              --bootstrap-region-id RegionOne
+    keystone-manage bootstrap
+    --bootstrap-password {{ keystone_admin_password }}
+    --bootstrap-admin-url http://{{ ansible_fqdn }}:5000/v3/
+    --bootstrap-internal-url http://{{ ansible_fqdn }}:5000/v3/
+    --bootstrap-public-url http://{{ ansible_fqdn }}:5000/v3/
+    --bootstrap-region-id RegionOne
+
+- name: Configure Apache for Keystone
+  block:
+    - name: Enable Apache modules
+      command: a2enmod wsgi
+      notify: Restart Apache
+
+    - name: Create Keystone WSGI file
+      copy:
+        content: |
+          WSGIDaemonProcess keystone processes=5 threads=1 user=keystone group=keystone display-name=%{GROUP}
+          WSGIProcessGroup keystone
+          WSGIScriptAlias / /usr/bin/keystone-wsgi-public
+
+          <VirtualHost *:5000>
+              WSGIProcessGroup keystone
+              WSGIScriptAlias / /usr/bin/keystone-wsgi-public
+              WSGIPassAuthorization On
+              ErrorLog /var/log/apache2/keystone-error.log
+              CustomLog /var/log/apache2/keystone-access.log combined
+          </VirtualHost>
+
+          <VirtualHost *:35357>
+              WSGIProcessGroup keystone
+              WSGIScriptAlias / /usr/bin/keystone-wsgi-admin
+              WSGIPassAuthorization On
+              ErrorLog /var/log/apache2/keystone-error.log
+              CustomLog /var/log/apache2/keystone-access.log combined
+          </VirtualHost>
+        dest: /etc/apache2/sites-available/keystone.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Enable Keystone site
+      command: a2ensite keystone
+      notify: Restart Apache
+
+- name: Restart Apache to apply changes
+  systemd:
+    name: apache2
+    state: restarted
+    enabled: true
 
 # Glance
 - name: Install Glance packages
