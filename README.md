@@ -1,3 +1,12 @@
+- name: Wait for apt lock to be released
+  shell: |
+    while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; do
+      echo "Waiting for apt lock to be released..."
+      sleep 5
+    done
+  changed_when: false
+
+
 # keystone
 - name: Install Keystone and dependencies
   apt:
