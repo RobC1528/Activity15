@@ -1,128 +1,68 @@
-# keystone
-- name: Install required packages
+# Neutron
+- name: Install Neutron packages
   apt:
-    name: 
-      - software-properties-common
-      - mariadb-server
-      - python3-pymysql
+    name:
+      - neutron-server
+      - neutron-plugin-ml2
+      - neutron-linuxbridge-agent
+      - neutron-dhcp-agent
+      - neutron-metadata-agent
     state: present
-    update_cache: yes
 
-- name: Configure MariaDB for OpenStack
-  copy:
-    content: |
-      [mysqld]
-      bind-address = {{ controller_ip }}
-      default-storage-engine = innodb
-      innodb_file_per_table = on
-      max_connections = 4096
-      collation-server = utf8_general_ci
-      character-set-server = utf8
-    dest: /etc/mysql/mariadb.conf.d/99-openstack.cnf
-  notify: Restart MariaDB
+- name: Configure Neutron
+  lineinfile:
+    path: /etc/neutron/neutron.conf
+    regexp: "^#?connection=.*"
+    line: "connection = mysql+pymysql://neutron:{{ db_password }}@{{ controller_ip }}/neutron"
 
-- name: Restart MariaDB
+- name: Populate Neutron database
+  shell: |
+    su -s /bin/bash neutron -c "neutron-db-manage upgrade head"
+
+- name: Restart Neutron services
   service:
-    name: mariadb
+    name: "{{ item }}"
+    state: restarted
+  with_items:
+    - neutron-server
+    - neutron-linuxbridge-agent
+    - neutron-dhcp-agent
+    - neutron-metadata-agent
+
+# Horizon
+- name: Install Horizon
+  apt:
+    name: openstack-dashboard
+    state: present
+
+- name: Restart Apache2
+  service:
+    name: apache2
     state: restarted
 
-- name: Create Keystone database
-  mysql_db:
-    name: keystone
-    state: present
-
-- name: Create Keystone database user
-  mysql_user:
-    name: keystone
-    password: "{{ db_password }}"
-    host: "%"
-    priv: "keystone.*:ALL"
-    state: present
-
-- name: Install Keystone packages
+# Cinder
+- name: Install Cinder packages
   apt:
-    name: 
-      - keystone
-      - apache2
-      - libapache2-mod-wsgi-py3
+    name:
+      - cinder-api
+      - cinder-scheduler
+      - python3-cinderclient
     state: present
 
-- name: Configure Keystone
+- name: Configure Cinder
   lineinfile:
-    path: /etc/keystone/keystone.conf
+    path: /etc/cinder/cinder.conf
     regexp: "^#?connection=.*"
-    line: "connection = mysql+pymysql://keystone:{{ db_password }}@{{ controller_ip }}/keystone"
+    line: "connection = mysql+pymysql://cinder:{{ db_password }}@{{ controller_ip }}/cinder"
 
-- name: Populate Keystone database
+- name: Populate Cinder database
   shell: |
-    su -s /bin/bash keystone -c "keystone-manage db_sync"
+    su -s /bin/bash cinder -c "cinder-manage db sync"
 
-
-
-# glance
-- name: Create Glance database
-  mysql_db:
-    name: glance
-    state: present
-
-- name: Create Glance database user
-  mysql_user:
-    name: glance
-    password: "{{ db_password }}"
-    host: "%"
-    priv: "glance.*:ALL"
-    state: present
-
-- name: Install Glance packages
-  apt:
-    name: 
-      - glance
-    state: present
-
-- name: Configure Glance API
-  lineinfile:
-    path: /etc/glance/glance-api.conf
-    regexp: "^#?connection=.*"
-    line: "connection = mysql+pymysql://glance:{{ db_password }}@{{ controller_ip }}/glance"
-
-- name: Populate Glance database
-  shell: |
-    su -s /bin/bash glance -c "glance-manage db_sync"
-
-
-# nova
-- name: Create Nova databases
-  mysql_db:
+- name: Restart Cinder services
+  service:
     name: "{{ item }}"
-    state: present
+    state: restarted
   with_items:
-    - nova
-    - nova_api
-    - nova_cell0
-
-- name: Create Nova database user
-  mysql_user:
-    name: nova
-    password: "{{ db_password }}"
-    host: "%"
-    priv: "nova.*:ALL"
-    state: present
-
-- name: Install Nova packages
-  apt:
-    name: 
-      - nova-api
-      - nova-conductor
-      - nova-novncproxy
-    state: present
-
-- name: Configure Nova
-  lineinfile:
-    path: /etc/nova/nova.conf
-    regexp: "^#?connection=.*"
-    line: "connection = mysql+pymysql://nova:{{ db_password }}@{{ controller_ip }}/nova"
-
-- name: Populate Nova databases
-  shell: |
-    su -s /bin/bash nova -c "nova-manage api_db sync && nova-manage cell_v2 map_cell0"
-
+    - cinder-api
+    - cinder-scheduler
