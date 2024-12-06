@@ -1,0 +1,7 @@
+- name: Deploy OpenStack Services
+  hosts: all
+  become: true
+  tasks:
+    - import_tasks: tasks/neutron.yml
+    - import_tasks: tasks/horizon.yml
+    - import_tasks: tasks/cinder.yml

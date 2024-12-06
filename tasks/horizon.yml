@@ -1,0 +1,10 @@
+# Horizon
+- name: Install Horizon
+  apt:
+    name: openstack-dashboard
+    state: present
+
+- name: Restart Apache2
+  service:
+    name: apache2
+    state: restarted
