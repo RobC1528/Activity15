@@ -60,75 +60,69 @@
 
 
 # glance
-- name: Install Glance (Image Service)
-  hosts: controller
-  become: true
-  tasks:
-    - name: Create Glance database
-      mysql_db:
-        name: glance
-        state: present
+- name: Create Glance database
+  mysql_db:
+    name: glance
+    state: present
 
-    - name: Create Glance database user
-      mysql_user:
-        name: glance
-        password: "{{ db_password }}"
-        host: "%"
-        priv: "glance.*:ALL"
-        state: present
+- name: Create Glance database user
+  mysql_user:
+    name: glance
+    password: "{{ db_password }}"
+    host: "%"
+    priv: "glance.*:ALL"
+    state: present
 
-    - name: Install Glance packages
-      apt:
-        name: 
-          - glance
-        state: present
+- name: Install Glance packages
+  apt:
+    name: 
+      - glance
+    state: present
 
-    - name: Configure Glance API
-      lineinfile:
-        path: /etc/glance/glance-api.conf
-        regexp: "^#?connection=.*"
-        line: "connection = mysql+pymysql://glance:{{ db_password }}@{{ controller_ip }}/glance"
+- name: Configure Glance API
+  lineinfile:
+    path: /etc/glance/glance-api.conf
+    regexp: "^#?connection=.*"
+    line: "connection = mysql+pymysql://glance:{{ db_password }}@{{ controller_ip }}/glance"
 
-    - name: Populate Glance database
-      shell: |
-        su -s /bin/bash glance -c "glance-manage db_sync"
+- name: Populate Glance database
+  shell: |
+    su -s /bin/bash glance -c "glance-manage db_sync"
+
 
 # nova
-- name: Install Nova (Compute Service)
-  hosts: controller
-  become: true
-  tasks:
-    - name: Create Nova databases
-      mysql_db:
-        name: nova
-        state: present
-      with_items:
-        - nova
-        - nova_api
-        - nova_cell0
+- name: Create Nova databases
+  mysql_db:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - nova
+    - nova_api
+    - nova_cell0
 
-    - name: Create Nova database user
-      mysql_user:
-        name: nova
-        password: "{{ db_password }}"
-        host: "%"
-        priv: "nova.*:ALL"
-        state: present
+- name: Create Nova database user
+  mysql_user:
+    name: nova
+    password: "{{ db_password }}"
+    host: "%"
+    priv: "nova.*:ALL"
+    state: present
 
-    - name: Install Nova packages
-      apt:
-        name: 
-          - nova-api
-          - nova-conductor
-          - nova-novncproxy
-        state: present
+- name: Install Nova packages
+  apt:
+    name: 
+      - nova-api
+      - nova-conductor
+      - nova-novncproxy
+    state: present
 
-    - name: Configure Nova
-      lineinfile:
-        path: /etc/nova/nova.conf
-        regexp: "^#?connection=.*"
-        line: "connection = mysql+pymysql://nova:{{ db_password }}@{{ controller_ip }}/nova"
+- name: Configure Nova
+  lineinfile:
+    path: /etc/nova/nova.conf
+    regexp: "^#?connection=.*"
+    line: "connection = mysql+pymysql://nova:{{ db_password }}@{{ controller_ip }}/nova"
 
-    - name: Populate Nova databases
-      shell: |
-        su -s /bin/bash nova -c "nova-manage api_db sync && nova-manage cell_v2 map_cell0"
+- name: Populate Nova databases
+  shell: |
+    su -s /bin/bash nova -c "nova-manage api_db sync && nova-manage cell_v2 map_cell0"
+
