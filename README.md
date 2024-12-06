@@ -61,6 +61,7 @@
       shell: |
         su -s /bin/bash keystone -c "keystone-manage db_sync"
 
+
 # glance
 - name: Install Glance (Image Service)
   hosts: controller
