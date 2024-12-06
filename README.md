@@ -1,65 +1,62 @@
 # keystone
-- name: Install Keystone (Identity Service)
-  hosts: controller
-  become: true
-  tasks:
-    - name: Install required packages
-      apt:
-        name: 
-          - software-properties-common
-          - mariadb-server
-          - python3-pymysql
-        state: present
-        update_cache: yes
+- name: Install required packages
+  apt:
+    name: 
+      - software-properties-common
+      - mariadb-server
+      - python3-pymysql
+    state: present
+    update_cache: yes
 
-    - name: Configure MariaDB for OpenStack
-      copy:
-        content: |
-          [mysqld]
-          bind-address = {{ controller_ip }}
-          default-storage-engine = innodb
-          innodb_file_per_table = on
-          max_connections = 4096
-          collation-server = utf8_general_ci
-          character-set-server = utf8
-        dest: /etc/mysql/mariadb.conf.d/99-openstack.cnf
-      notify: Restart MariaDB
+- name: Configure MariaDB for OpenStack
+  copy:
+    content: |
+      [mysqld]
+      bind-address = {{ controller_ip }}
+      default-storage-engine = innodb
+      innodb_file_per_table = on
+      max_connections = 4096
+      collation-server = utf8_general_ci
+      character-set-server = utf8
+    dest: /etc/mysql/mariadb.conf.d/99-openstack.cnf
+  notify: Restart MariaDB
 
-    - name: Restart MariaDB
-      service:
-        name: mariadb
-        state: restarted
+- name: Restart MariaDB
+  service:
+    name: mariadb
+    state: restarted
 
-    - name: Create Keystone database
-      mysql_db:
-        name: keystone
-        state: present
+- name: Create Keystone database
+  mysql_db:
+    name: keystone
+    state: present
 
-    - name: Create Keystone database user
-      mysql_user:
-        name: keystone
-        password: "{{ db_password }}"
-        host: "%"
-        priv: "keystone.*:ALL"
-        state: present
+- name: Create Keystone database user
+  mysql_user:
+    name: keystone
+    password: "{{ db_password }}"
+    host: "%"
+    priv: "keystone.*:ALL"
+    state: present
 
-    - name: Install Keystone packages
-      apt:
-        name: 
-          - keystone
-          - apache2
-          - libapache2-mod-wsgi-py3
-        state: present
+- name: Install Keystone packages
+  apt:
+    name: 
+      - keystone
+      - apache2
+      - libapache2-mod-wsgi-py3
+    state: present
 
-    - name: Configure Keystone
-      lineinfile:
-        path: /etc/keystone/keystone.conf
-        regexp: "^#?connection=.*"
-        line: "connection = mysql+pymysql://keystone:{{ db_password }}@{{ controller_ip }}/keystone"
+- name: Configure Keystone
+  lineinfile:
+    path: /etc/keystone/keystone.conf
+    regexp: "^#?connection=.*"
+    line: "connection = mysql+pymysql://keystone:{{ db_password }}@{{ controller_ip }}/keystone"
 
-    - name: Populate Keystone database
-      shell: |
-        su -s /bin/bash keystone -c "keystone-manage db_sync"
+- name: Populate Keystone database
+  shell: |
+    su -s /bin/bash keystone -c "keystone-manage db_sync"
+
 
 
 # glance
